@@ -1,0 +1,47 @@
+import { test } from "node:test";
+import assert from "node:assert/strict";
+import { TrainingSession } from "../src/session.js";
+test("pause excludes inactive time; resume and finish preserve hits", () => {
+  let time = 0;
+  const s = new TrainingSession(() => time);
+  s.start(30);
+  time = 5000;
+  s.hit();
+  s.pause();
+  time = 25000;
+  s.hit();
+  assert.equal(s.milliseconds(), 5000);
+  assert.equal(s.hits, 1);
+  s.resume();
+  time = 29000;
+  s.hit();
+  const result = s.finish();
+  assert.equal(result.activeSeconds, 9);
+  assert.equal(result.hits, 2);
+  assert.equal(s.finish(), undefined);
+});
+test("duration is capped and expired sessions reject hits", () => {
+  let time = 0;
+  const s = new TrainingSession(() => time);
+  s.start(30);
+  time = 31000;
+  s.hit();
+  assert.equal(s.finish().activeSeconds, 30);
+  assert.equal(s.hits, 0);
+});
+test("repeated start cannot reset active or paused sessions", () => {
+  let time = 0;
+  const s = new TrainingSession(() => time);
+  s.start(30);
+  time = 3000;
+  s.start(60);
+  assert.equal(s.duration, 30000);
+  s.pause();
+  s.start(60);
+  assert.equal(s.state, "paused");
+  assert.equal(s.milliseconds(), 3000);
+  s.finish();
+  s.start(60);
+  assert.equal(s.milliseconds(), 0);
+  assert.equal(s.duration, 60000);
+});
